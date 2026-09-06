@@ -52,8 +52,8 @@
             margin: 5px;
             border: none;
             border-radius: 25px;
-            background: #007bff;
-            color: white;
+            background: #e0e0e0;   /* grau für neutrale Buttons */
+            color: #333;
             font-size: 1rem;
             cursor: pointer;
             width: auto;
@@ -61,16 +61,27 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             transition: background 0.2s;
         }
-        .btn:active { background: #0056b3; }
-        .btn.secondary { background: #6c757d; }
+        .btn:active { background: #ccc; }
+        .btn.secondary { background: #6c757d; color: white; }
         .btn.secondary:active { background: #5a6268; }
-        .btn.success { background: #28a745; }
+        .btn.success { background: #28a745; color: white; }
         .btn.success:active { background: #1e7e34; }
-        .btn.danger { background: #dc3545; }
+        .btn.danger { background: #dc3545; color: white; }
         .btn.danger:active { background: #b02a37; }
         .btn.warning { background: #ffc107; color: #333; }
         .btn.warning:active { background: #e0a800; }
         .btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* Ausgewählte Buttons */
+        .btn.selected-tank {
+            background: #007bff;
+            color: white;
+        }
+        .btn.selected-bonus {
+            background: #28a745;
+            color: white;
+        }
+
         .section {
             background: #f8f9fa;
             border-radius: 10px;
@@ -177,6 +188,36 @@
             min-width: 30px;
             text-align: center;
         }
+        #animationOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            visibility: hidden;
+            flex-direction: column;
+        }
+        #animationOverlay.active { visibility: visible; }
+        #plane {
+            font-size: 60px;
+            animation: fly 1.5s ease-in-out forwards;
+        }
+        @keyframes fly {
+            0% { transform: translateX(-200px); }
+            100% { transform: translateX(200px); }
+        }
+        .overlay-text {
+            color: white;
+            font-size: 24px;
+            margin-top: 20px;
+            text-align: center;
+            padding: 0 20px;
+        }
     </style>
 </head>
 <body>
@@ -203,7 +244,7 @@
 
             <!-- Tankphase -->
             <div id="tankSection" class="section hidden">
-                <h2>Tanken &amp; Reserve ablegen</h2>
+                <h2>Tanken oder Bonuskarte</h2>
                 <p>Tank: <strong id="tankBeforeRefuel">0 km</strong></p>
                 <div>
                     <button class="btn" id="btnTank" onclick="chooseTankAction('tank')">Tanken (+1000 km)</button>
@@ -246,12 +287,19 @@
         <button class="btn danger" onclick="stopScan()">Abbrechen</button>
     </div>
 
+    <!-- Animations-Overlay -->
+    <div id="animationOverlay">
+        <div id="plane">🛫</div>
+        <div class="overlay-text" id="animationText">Flug läuft...</div>
+    </div>
+
     <script>
         // ==================== GLOBALE VARIABLEN ====================
         let currentRound = 0;
         let tank = 1500;          // Starttank
         let totalPoints = 0;
-        let bonusCards = 0;
+        let bonusCards = 0;       // dauerhaft erhaltene Bonuskarten
+        let tempBonusIncrease = 0; // temporär: 1 wenn 'bonus' gewählt, sonst 0
         let currentAirport = null;   // { name, country, lat, lon, population, bonus? }
         let currentTankAction = null; // 'tank', 'bonus', oder null
         let discardCount = 0;         // Anzahl in dieser Tankphase abgelegter Reservekarten
@@ -297,7 +345,7 @@
             historyStack.push({
                 currentRound, tank, totalPoints, bonusCards, currentAirport,
                 currentTankAction, discardCount, flightRoute: [...flightRoute],
-                logEntries: [...logEntries]
+                logEntries: [...logEntries], tempBonusIncrease
             });
             if (historyStack.length > 20) historyStack.shift();
         }
@@ -317,6 +365,7 @@
             discardCount = state.discardCount;
             flightRoute = state.flightRoute.map(f => ({...f}));
             logEntries = [...state.logEntries];
+            tempBonusIncrease = state.tempBonusIncrease;
             updateStatus();
             renderFlightRoute();
             updateLogDisplay();
@@ -355,6 +404,7 @@
             document.getElementById('flightSection').classList.add('hidden');
             currentTankAction = null;
             discardCount = 0;
+            tempBonusIncrease = 0;   // zurücksetzen
             updateTankUI();
             updateStatus();
         }
@@ -375,36 +425,45 @@
             const btnTank = document.getElementById('btnTank');
             const btnBonus = document.getElementById('btnBonus');
             if (currentTankAction === 'tank') {
-                btnTank.classList.add('selected');
-                btnBonus.classList.remove('selected');
+                btnTank.classList.add('selected-tank');
+                btnBonus.classList.remove('selected-bonus');
                 document.getElementById('tankActionInfo').textContent = 'Gewählt: Tanken +1000 km';
             } else if (currentTankAction === 'bonus') {
-                btnBonus.classList.add('selected');
-                btnTank.classList.remove('selected');
-                document.getElementById('tankActionInfo').textContent = 'Gewählt: Bonuskarte erhalten';
+                btnBonus.classList.add('selected-bonus');
+                btnTank.classList.remove('selected-tank');
+                document.getElementById('tankActionInfo').textContent = 'Gewählt: Bonuskarte erhalten (+250 km Tanklimit)';
             } else {
-                btnTank.classList.remove('selected');
-                btnBonus.classList.remove('selected');
+                btnTank.classList.remove('selected-tank');
+                btnBonus.classList.remove('selected-bonus');
                 document.getElementById('tankActionInfo').textContent = 'Bitte wählen.';
             }
+            // Aktualisiere Limit-Anzeige? (optional)
         }
 
         function chooseTankAction(action) {
+            if (currentTankAction === action) return; // nichts tun
+            // Alten temporären Bonus zurücksetzen
+            if (currentTankAction === 'bonus') {
+                tempBonusIncrease = 0;
+            }
             currentTankAction = action;
+            if (action === 'bonus') {
+                tempBonusIncrease = 1; // +250 km Tanklimit sofort
+            } else {
+                tempBonusIncrease = 0;
+            }
             updateTankUI();
+            updateStatus();
         }
 
         function discardReserve() {
-            const maxTank = 4000 + bonusCards * 250;
-            if (tank + 1000 <= maxTank) {
-                tank += 1000;
-                discardCount++;
-                updateTankUI();
-                updateStatus();
-                addLog(`Reserve abgelegt: +1000 km. Tank jetzt ${Math.round(tank)} km.`);
-            } else {
-                alert('Tanklimit erreicht!');
-            }
+            const maxTank = 4000 + (bonusCards + tempBonusIncrease) * 250;
+            const newTank = Math.min(maxTank, tank + 1000);
+            tank = newTank;
+            discardCount++;
+            updateTankUI();
+            updateStatus();
+            addLog(`Reserve abgelegt: +1000 km. Tank jetzt ${Math.round(tank)} km.`);
         }
 
         function undoDiscardReserve() {
@@ -425,12 +484,13 @@
                 return;
             }
             if (currentTankAction === 'tank') {
-                const maxTank = 4000 + bonusCards * 250;
+                const maxTank = 4000 + (bonusCards + tempBonusIncrease) * 250;
                 tank = Math.min(maxTank, tank + 1000);
                 addLog(`Tanken: +1000 km, Tank jetzt ${Math.round(tank)} km.`);
             } else { // bonus
-                bonusCards++;
-                addLog('Bonuskarte erhalten! Tanklimit erhöht um 250 km.');
+                bonusCards += tempBonusIncrease; // dauerhaft übernehmen
+                tempBonusIncrease = 0;
+                addLog('Bonuskarte erhalten! Tanklimit dauerhaft um 250 km erhöht.');
             }
             // Nach dem Tanken/ Bonuskarte geht es zur Flugauswahl
             pushHistory();
@@ -444,7 +504,6 @@
             flightRoute.forEach((airport, index) => {
                 const li = document.createElement('li');
                 li.className = 'list-item';
-                li.draggable = false; // mobile-friendly: wir nutzen Buttons
                 const infoDiv = document.createElement('div');
                 infoDiv.className = 'airport-info';
                 infoDiv.innerHTML = `<strong>${airport.name}</strong> (${airport.country})`;
@@ -547,7 +606,6 @@
                     throw new Error('Ungültiger QR-Code');
                 }
             } catch (e) {
-                // Fallback: als reiner Text mit Komma-Trennung? (nicht implementiert)
                 alert('QR-Code konnte nicht gelesen werden. Stelle sicher, dass er JSON enthält.');
                 stopScan();
                 return;
@@ -561,14 +619,13 @@
                 tank = 1500;
                 totalPoints = 0;
                 bonusCards = 0;
+                tempBonusIncrease = 0;
                 historyStack = [];
                 logEntries = [];
                 addLog(`Spiel gestartet mit Startflughafen ${airport.name}.`);
                 pushHistory();
                 showTankPhase();
             } else if (scanTarget === 'flight') {
-                // Duplikate vermeiden? Optional erlauben wir Mehrfach-Scans, aber normalerweise nicht.
-                // Wir prüfen, ob der Flughafen bereits in der Route ist (anhand Name+Koordinaten).
                 const exists = flightRoute.some(f => f.name === airport.name && f.lat === airport.lat && f.lon === airport.lon);
                 if (!exists) {
                     flightRoute.push(airport);
@@ -595,36 +652,43 @@
             let negativePointsSum = 0;
             let roundLog = [];
             let currentAirportCopy = { ...currentAirport };
+            let totalAirportBonusPercent = 0; // Summe der Boni der erfolgreichen Flughäfen
 
             for (const airport of flightRoute) {
                 const distance = haversineDistance(currentAirportCopy, airport);
                 const tankBefore = tank;
-                if (distance <= tank) {
+                const success = distance <= tank;
+                if (success) {
                     successCount++;
                     successfulDistanceSum += distance;
                     tank -= distance;
                     currentAirportCopy = { ...airport };
                     roundLog.push(`Flug nach ${airport.name}: ${Math.round(distance)} km, Resttank ${Math.round(tank)} km.`);
+                    // Bonus dieses Flughafens (Prozent) sammeln
+                    totalAirportBonusPercent += airport.bonus || 0;
                 } else {
                     const missing = distance - tankBefore;
                     const negPoints = -1 * Math.ceil(missing / 100);
                     negativePointsSum += negPoints;
                     tank = 0;
-                    currentAirportCopy = { ...airport }; // auch wenn nicht erreicht, laut Regeln
+                    currentAirportCopy = { ...airport }; // auch wenn nicht erreicht
                     roundLog.push(`Flug nach ${airport.name}: Tank für ${Math.round(distance)} km reicht nicht! ${Math.round(missing)} km fehlen. (${negPoints} Punkte)`);
                 }
+                // Animation anzeigen
+                await showFlightAnimation(airport.name, distance, success);
             }
 
-            // Bonusstaffel
-            const bonusPercent = getBonusPercent(successCount);
-            const bonusDistance = successfulDistanceSum * bonusPercent / 100;
+            // Gesamtbonus = Kettenbonus + Airport-Bonus
+            const chainBonusPercent = getBonusPercent(successCount);
+            const totalBonusPercent = chainBonusPercent + totalAirportBonusPercent;
+            const bonusDistance = successfulDistanceSum * totalBonusPercent / 100;
             const positivePoints = Math.ceil((successfulDistanceSum + bonusDistance) / 100);
             const totalRoundPoints = positivePoints + negativePointsSum;
             totalPoints += totalRoundPoints;
 
             addLog(`--- Runde ${currentRound} abgeschlossen ---`);
             roundLog.forEach(msg => addLog(msg));
-            addLog(`Erfolgreiche Flüge: ${successCount}, Distanz: ${Math.round(successfulDistanceSum)} km, Bonus: ${bonusPercent}% (+${Math.round(bonusDistance)} km)`);
+            addLog(`Erfolgreiche Flüge: ${successCount}, Distanz: ${Math.round(successfulDistanceSum)} km, Kettenbonus: ${chainBonusPercent}%, Flughafen-Bonus: ${totalAirportBonusPercent}%, Gesamtbonus: ${totalBonusPercent}% (+${Math.round(bonusDistance)} km)`);
             addLog(`Punkte diese Runde: ${totalRoundPoints} (Positive: ${positivePoints}, Negative: ${negativePointsSum})`);
             updateStatus();
 
@@ -659,6 +723,7 @@
             tank = 1500;
             totalPoints = 0;
             bonusCards = 0;
+            tempBonusIncrease = 0;
             currentAirport = null;
             flightRoute = [];
             historyStack = [];
@@ -667,9 +732,26 @@
             showStartSection();
         }
 
+        // ==================== ANIMATION ====================
+        function showFlightAnimation(airportName, distance, success) {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('animationOverlay');
+                const text = document.getElementById('animationText');
+                text.textContent = `Flug nach ${airportName} (${Math.round(distance)} km) – ${success ? 'Erfolgreich' : 'Tank reicht nicht!'}`;
+                overlay.classList.add('active');
+                const plane = document.getElementById('plane');
+                plane.style.animation = 'none';
+                void plane.offsetWidth;
+                plane.style.animation = 'fly 1.5s ease-in-out forwards';
+                setTimeout(() => {
+                    overlay.classList.remove('active');
+                    resolve();
+                }, 1500);
+            });
+        }
+
         // ==================== UNDO (Test) ====================
         // Button kann im HTML ergänzt werden, aktuell nicht sichtbar.
-        // Wir könnten einen Undo-Button in die Statusleiste einfügen.
         // Hier nur Funktion vorhanden.
 
         // ==================== INIT ====================
