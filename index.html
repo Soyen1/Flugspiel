@@ -52,7 +52,7 @@
             margin: 5px;
             border: none;
             border-radius: 25px;
-            background: #e0e0e0;   /* grau für neutrale Buttons */
+            background: #e0e0e0;
             color: #333;
             font-size: 1rem;
             cursor: pointer;
@@ -72,7 +72,6 @@
         .btn.warning:active { background: #e0a800; }
         .btn:disabled { background: #ccc; cursor: not-allowed; }
 
-        /* Ausgewählte Buttons */
         .btn.selected-tank {
             background: #007bff;
             color: white;
@@ -135,21 +134,21 @@
             align-items: center;
             justify-content: center;
         }
-        #scannerOverlay {
+        #scannerOverlay, #animationOverlay, #summaryOverlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.85);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            z-index: 1000;
+            z-index: 2000;
             visibility: hidden;
         }
-        #scannerOverlay.active { visibility: visible; }
+        #scannerOverlay.active, #animationOverlay.active, #summaryOverlay.active { visibility: visible; }
         #video {
             width: 90%;
             max-width: 400px;
@@ -161,8 +160,37 @@
             margin-top: 15px;
             font-size: 1.1rem;
         }
-        #closeScanner {
+        #plane {
+            font-size: 60px;
+            animation: fly 1.5s ease-in-out forwards;
+        }
+        @keyframes fly {
+            0% { transform: translateX(-200px); }
+            100% { transform: translateX(200px); }
+        }
+        .overlay-text {
+            color: white;
+            font-size: 24px;
             margin-top: 20px;
+            text-align: center;
+            padding: 0 20px;
+        }
+        .summary-box {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            width: 85%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .summary-box h2 {
+            margin-bottom: 10px;
+            color: #1a3e6e;
+        }
+        .summary-box p {
+            margin: 8px 0;
+            font-size: 1.1rem;
         }
         #logArea {
             max-height: 200px;
@@ -188,43 +216,12 @@
             min-width: 30px;
             text-align: center;
         }
-        #animationOverlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 2000;
-            visibility: hidden;
-            flex-direction: column;
-        }
-        #animationOverlay.active { visibility: visible; }
-        #plane {
-            font-size: 60px;
-            animation: fly 1.5s ease-in-out forwards;
-        }
-        @keyframes fly {
-            0% { transform: translateX(-200px); }
-            100% { transform: translateX(200px); }
-        }
-        .overlay-text {
-            color: white;
-            font-size: 24px;
-            margin-top: 20px;
-            text-align: center;
-            padding: 0 20px;
-        }
     </style>
 </head>
 <body>
     <div id="app">
         <h1>✈️ Flugreisen Punktejagd</h1>
 
-        <!-- Status Bar -->
         <div class="status-bar">
             <div class="status-item">Runde: <span id="roundDisplay">0/12</span></div>
             <div class="status-item">Punkte: <span id="pointsDisplay">0</span></div>
@@ -233,16 +230,13 @@
             <div class="status-item">Aktueller Flughafen: <span id="currentAirportDisplay">–</span></div>
         </div>
 
-        <!-- Hauptbereich -->
         <div id="gameArea">
-            <!-- Startphase -->
             <div id="startSection" class="section">
                 <h2>Startflughafen scannen</h2>
                 <p>Bitte QR-Code des Startflughafens einscannen.</p>
                 <button class="btn" onclick="startScan('start')">QR scannen</button>
             </div>
 
-            <!-- Tankphase -->
             <div id="tankSection" class="section hidden">
                 <h2>Tanken oder Bonuskarte</h2>
                 <p>Tank: <strong id="tankBeforeRefuel">0 km</strong></p>
@@ -262,7 +256,6 @@
                 <button class="btn primary" onclick="finishTankPhase()">Weiter zur Flugauswahl</button>
             </div>
 
-            <!-- Flugauswahl -->
             <div id="flightSection" class="section hidden">
                 <h2>Flugroute wählen</h2>
                 <p>Scanne die Flughäfen in der gewünschten Reihenfolge.</p>
@@ -275,7 +268,6 @@
             </div>
         </div>
 
-        <!-- Protokoll umschalten -->
         <button class="btn secondary" onclick="toggleLog()" style="margin-top:10px;">Protokoll anzeigen/ausblenden</button>
         <div id="logArea" class="hidden"></div>
     </div>
@@ -293,22 +285,38 @@
         <div class="overlay-text" id="animationText">Flug läuft...</div>
     </div>
 
+    <!-- Zusammenfassungs-Overlay -->
+    <div id="summaryOverlay">
+        <div class="summary-box">
+            <h2>Rundenabschluss</h2>
+            <p>Erfolgreiche Flüge: <span id="summarySuccessCount"></span></p>
+            <p>Distanz: <span id="summaryDistance"></span> km</p>
+            <p>Kettenbonus: <span id="summaryChainBonus"></span>%</p>
+            <p>Flughafen-Bonus: <span id="summaryAirportBonus"></span>%</p>
+            <p>Gesamtbonus: <span id="summaryTotalBonus"></span>%</p>
+            <p>Positive Punkte: <span id="summaryPositive"></span></p>
+            <p>Negative Punkte: <span id="summaryNegative"></span></p>
+            <p>Gesamtpunkte diese Runde: <span id="summaryTotalPoints"></span></p>
+            <button class="btn primary" onclick="closeSummary()">Weiter</button>
+        </div>
+    </div>
+
     <script>
         // ==================== GLOBALE VARIABLEN ====================
         let currentRound = 0;
-        let tank = 1500;          // Starttank
+        let tank = 1500;
         let totalPoints = 0;
-        let bonusCards = 0;       // dauerhaft erhaltene Bonuskarten
-        let tempBonusIncrease = 0; // temporär: 1 wenn 'bonus' gewählt, sonst 0
-        let currentAirport = null;   // { name, country, lat, lon, population, bonus? }
-        let currentTankAction = null; // 'tank', 'bonus', oder null
-        let discardCount = 0;         // Anzahl in dieser Tankphase abgelegter Reservekarten
-        let flightRoute = [];         // Array von Flughafen-Objekten
-        let scanTarget = null;        // 'start' oder 'flight'
+        let bonusCards = 0;
+        let tempBonusIncrease = 0;
+        let currentAirport = null;
+        let currentTankAction = null;
+        let discardCount = 0;
+        let discardSnapshots = [];   // speichert Tank vor jedem Ablegen
+        let flightRoute = [];
+        let scanTarget = null;
         let historyStack = [];
         let logEntries = [];
 
-        // Kamera-Stream
         let videoStream = null;
         let scannerActive = false;
 
@@ -345,10 +353,11 @@
             historyStack.push({
                 currentRound, tank, totalPoints, bonusCards, currentAirport,
                 currentTankAction, discardCount, flightRoute: [...flightRoute],
-                logEntries: [...logEntries], tempBonusIncrease
+                logEntries: [...logEntries], tempBonusIncrease, discardSnapshots: [...discardSnapshots]
             });
             if (historyStack.length > 20) historyStack.shift();
         }
+
         function undo() {
             if (historyStack.length <= 1) {
                 alert('Kein früherer Zustand verfügbar.');
@@ -366,13 +375,13 @@
             flightRoute = state.flightRoute.map(f => ({...f}));
             logEntries = [...state.logEntries];
             tempBonusIncrease = state.tempBonusIncrease;
+            discardSnapshots = [...state.discardSnapshots];
             updateStatus();
             renderFlightRoute();
             updateLogDisplay();
-            showTankPhase(); // oder passende Phase
+            showTankPhase();
         }
 
-        // Distanzberechnung (Haversine)
         function haversineDistance(coord1, coord2) {
             const R = 6371;
             const dLat = toRad(coord2.lat - coord1.lat);
@@ -382,7 +391,6 @@
         }
         function toRad(deg) { return deg * Math.PI / 180; }
 
-        // Bonusstaffel
         function getBonusPercent(n) {
             if (n <= 1) return 0;
             if (n === 2) return 10;
@@ -404,7 +412,8 @@
             document.getElementById('flightSection').classList.add('hidden');
             currentTankAction = null;
             discardCount = 0;
-            tempBonusIncrease = 0;   // zurücksetzen
+            discardSnapshots = [];
+            tempBonusIncrease = 0;
             updateTankUI();
             updateStatus();
         }
@@ -421,7 +430,6 @@
             document.getElementById('tankBeforeRefuel').textContent = `${Math.max(0, Math.round(tank))} km`;
             document.getElementById('discardCountDisplay').textContent = discardCount;
             document.getElementById('discardCountText').textContent = discardCount;
-            // Buttons Zustand
             const btnTank = document.getElementById('btnTank');
             const btnBonus = document.getElementById('btnBonus');
             if (currentTankAction === 'tank') {
@@ -437,18 +445,16 @@
                 btnBonus.classList.remove('selected-bonus');
                 document.getElementById('tankActionInfo').textContent = 'Bitte wählen.';
             }
-            // Aktualisiere Limit-Anzeige? (optional)
         }
 
         function chooseTankAction(action) {
-            if (currentTankAction === action) return; // nichts tun
-            // Alten temporären Bonus zurücksetzen
+            if (currentTankAction === action) return;
             if (currentTankAction === 'bonus') {
                 tempBonusIncrease = 0;
             }
             currentTankAction = action;
             if (action === 'bonus') {
-                tempBonusIncrease = 1; // +250 km Tanklimit sofort
+                tempBonusIncrease = 1;
             } else {
                 tempBonusIncrease = 0;
             }
@@ -458,8 +464,10 @@
 
         function discardReserve() {
             const maxTank = 4000 + (bonusCards + tempBonusIncrease) * 250;
-            const newTank = Math.min(maxTank, tank + 1000);
+            const oldTank = tank;
+            const newTank = Math.min(maxTank, oldTank + 1000);
             tank = newTank;
+            discardSnapshots.push(oldTank); // Ursprungstank merken
             discardCount++;
             updateTankUI();
             updateStatus();
@@ -467,8 +475,9 @@
         }
 
         function undoDiscardReserve() {
-            if (discardCount > 0) {
-                tank = Math.max(0, tank - 1000);
+            if (discardSnapshots.length > 0) {
+                const previousTank = discardSnapshots.pop();
+                tank = previousTank;
                 discardCount--;
                 updateTankUI();
                 updateStatus();
@@ -487,12 +496,11 @@
                 const maxTank = 4000 + (bonusCards + tempBonusIncrease) * 250;
                 tank = Math.min(maxTank, tank + 1000);
                 addLog(`Tanken: +1000 km, Tank jetzt ${Math.round(tank)} km.`);
-            } else { // bonus
-                bonusCards += tempBonusIncrease; // dauerhaft übernehmen
+            } else {
+                bonusCards += tempBonusIncrease;
                 tempBonusIncrease = 0;
                 addLog('Bonuskarte erhalten! Tanklimit dauerhaft um 250 km erhöht.');
             }
-            // Nach dem Tanken/ Bonuskarte geht es zur Flugauswahl
             pushHistory();
             showFlightSection();
         }
@@ -536,9 +544,7 @@
         function moveFlight(index, direction) {
             const newIndex = index + direction;
             if (newIndex < 0 || newIndex >= flightRoute.length) return;
-            const temp = flightRoute[index];
-            flightRoute[index] = flightRoute[newIndex];
-            flightRoute[newIndex] = temp;
+            [flightRoute[index], flightRoute[newIndex]] = [flightRoute[newIndex], flightRoute[index]];
             renderFlightRoute();
         }
 
@@ -570,8 +576,7 @@
 
         function stopScan() {
             scannerActive = false;
-            const overlay = document.getElementById('scannerOverlay');
-            overlay.classList.remove('active');
+            document.getElementById('scannerOverlay').classList.remove('active');
             if (videoStream) {
                 videoStream.getTracks().forEach(track => track.stop());
                 videoStream = null;
@@ -598,7 +603,6 @@
         }
 
         function handleQRCode(data) {
-            // Erwartet JSON-String mit Feldern: name, country, lat, lon, population, bonus?
             let airport;
             try {
                 airport = JSON.parse(data);
@@ -610,7 +614,6 @@
                 stopScan();
                 return;
             }
-            // Bonus optional
             airport.bonus = airport.bonus || 0;
             stopScan();
             if (scanTarget === 'start') {
@@ -652,7 +655,7 @@
             let negativePointsSum = 0;
             let roundLog = [];
             let currentAirportCopy = { ...currentAirport };
-            let totalAirportBonusPercent = 0; // Summe der Boni der erfolgreichen Flughäfen
+            let totalAirportBonusPercent = 0;
 
             for (const airport of flightRoute) {
                 const distance = haversineDistance(currentAirportCopy, airport);
@@ -664,34 +667,46 @@
                     tank -= distance;
                     currentAirportCopy = { ...airport };
                     roundLog.push(`Flug nach ${airport.name}: ${Math.round(distance)} km, Resttank ${Math.round(tank)} km.`);
-                    // Bonus dieses Flughafens (Prozent) sammeln
                     totalAirportBonusPercent += airport.bonus || 0;
                 } else {
                     const missing = distance - tankBefore;
                     const negPoints = -1 * Math.ceil(missing / 100);
                     negativePointsSum += negPoints;
                     tank = 0;
-                    currentAirportCopy = { ...airport }; // auch wenn nicht erreicht
+                    currentAirportCopy = { ...airport };
                     roundLog.push(`Flug nach ${airport.name}: Tank für ${Math.round(distance)} km reicht nicht! ${Math.round(missing)} km fehlen. (${negPoints} Punkte)`);
                 }
-                // Animation anzeigen
                 await showFlightAnimation(airport.name, distance, success);
             }
 
-            // Gesamtbonus = Kettenbonus + Airport-Bonus
             const chainBonusPercent = getBonusPercent(successCount);
             const totalBonusPercent = chainBonusPercent + totalAirportBonusPercent;
             const bonusDistance = successfulDistanceSum * totalBonusPercent / 100;
             const positivePoints = Math.ceil((successfulDistanceSum + bonusDistance) / 100);
             const totalRoundPoints = positivePoints + negativePointsSum;
-            totalPoints += totalRoundPoints;
 
+            // Logs hinzufügen
             addLog(`--- Runde ${currentRound} abgeschlossen ---`);
             roundLog.forEach(msg => addLog(msg));
             addLog(`Erfolgreiche Flüge: ${successCount}, Distanz: ${Math.round(successfulDistanceSum)} km, Kettenbonus: ${chainBonusPercent}%, Flughafen-Bonus: ${totalAirportBonusPercent}%, Gesamtbonus: ${totalBonusPercent}% (+${Math.round(bonusDistance)} km)`);
             addLog(`Punkte diese Runde: ${totalRoundPoints} (Positive: ${positivePoints}, Negative: ${negativePointsSum})`);
             updateStatus();
 
+            // Zusammenfassung anzeigen
+            await showRoundSummary({
+                successCount,
+                successfulDistanceSum,
+                chainBonusPercent,
+                totalAirportBonusPercent,
+                totalBonusPercent,
+                bonusDistance,
+                positivePoints,
+                negativePointsSum,
+                totalRoundPoints
+            });
+
+            // Punkte gutschreiben und Runde beenden
+            totalPoints += totalRoundPoints;
             currentAirport = currentAirportCopy;
             currentRound++;
             if (currentRound > 12) {
@@ -718,7 +733,6 @@
         function endGame() {
             addLog(`Spiel beendet! Gesamtpunkte: ${totalPoints}, Bonuskarten: ${bonusCards}`);
             alert(`Spiel beendet!\nGesamtpunkte: ${totalPoints}\nBonuskarten: ${bonusCards}`);
-            // Zurück zum Start
             currentRound = 0;
             tank = 1500;
             totalPoints = 0;
@@ -728,11 +742,12 @@
             flightRoute = [];
             historyStack = [];
             logEntries = [];
+            discardSnapshots = [];
             updateStatus();
             showStartSection();
         }
 
-        // ==================== ANIMATION ====================
+        // ==================== ANIMATIONEN ====================
         function showFlightAnimation(airportName, distance, success) {
             return new Promise((resolve) => {
                 const overlay = document.getElementById('animationOverlay');
@@ -750,9 +765,31 @@
             });
         }
 
+        function showRoundSummary(data) {
+            return new Promise((resolve) => {
+                document.getElementById('summarySuccessCount').textContent = data.successCount;
+                document.getElementById('summaryDistance').textContent = Math.round(data.successfulDistanceSum);
+                document.getElementById('summaryChainBonus').textContent = data.chainBonusPercent;
+                document.getElementById('summaryAirportBonus').textContent = data.totalAirportBonusPercent;
+                document.getElementById('summaryTotalBonus').textContent = data.totalBonusPercent;
+                document.getElementById('summaryPositive').textContent = data.positivePoints;
+                document.getElementById('summaryNegative').textContent = data.negativePointsSum;
+                document.getElementById('summaryTotalPoints').textContent = data.totalRoundPoints;
+                document.getElementById('summaryOverlay').classList.add('active');
+                window._summaryResolve = resolve;
+            });
+        }
+
+        function closeSummary() {
+            document.getElementById('summaryOverlay').classList.remove('active');
+            if (window._summaryResolve) {
+                window._summaryResolve();
+                window._summaryResolve = null;
+            }
+        }
+
         // ==================== UNDO (Test) ====================
-        // Button kann im HTML ergänzt werden, aktuell nicht sichtbar.
-        // Hier nur Funktion vorhanden.
+        // Funktion vorhanden, Button kann ergänzt werden
 
         // ==================== INIT ====================
         window.onload = function() {
