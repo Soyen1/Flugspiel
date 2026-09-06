@@ -71,16 +71,8 @@
         .btn.warning { background: #ffc107; color: #333; }
         .btn.warning:active { background: #e0a800; }
         .btn:disabled { background: #ccc; cursor: not-allowed; }
-
-        .btn.selected-tank {
-            background: #007bff;
-            color: white;
-        }
-        .btn.selected-bonus {
-            background: #28a745;
-            color: white;
-        }
-
+        .btn.selected-tank { background: #007bff; color: white; }
+        .btn.selected-bonus { background: #28a745; color: white; }
         .section {
             background: #f8f9fa;
             border-radius: 10px;
@@ -91,10 +83,7 @@
             font-size: 1.2rem;
             margin-bottom: 10px;
         }
-        .list-container {
-            list-style: none;
-            padding: 0;
-        }
+        .list-container { list-style: none; padding: 0; }
         .list-item {
             display: flex;
             align-items: center;
@@ -106,7 +95,7 @@
         }
         .airport-info {
             flex: 1 1 auto;
-            min-width: 0;              /* erlaubt Umbruch */
+            min-width: 0;
             overflow-wrap: break-word;
             word-break: break-word;
             margin-right: 8px;
@@ -114,7 +103,7 @@
         .move-btns {
             display: flex;
             gap: 4px;
-            flex-shrink: 0;           /* verhindert Schrumpfen */
+            flex-shrink: 0;
         }
         .move-btns button {
             background: #e9ecef;
@@ -146,10 +135,7 @@
         }
         #scannerOverlay, #animationOverlay, #summaryOverlay {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.85);
             display: flex;
             flex-direction: column;
@@ -165,11 +151,7 @@
             border-radius: 10px;
             border: 3px solid white;
         }
-        #scanHint {
-            color: white;
-            margin-top: 15px;
-            font-size: 1.1rem;
-        }
+        #scanHint { color: white; margin-top: 15px; font-size: 1.1rem; }
         #plane {
             font-size: 60px;
             animation: fly 1.5s ease-in-out forwards;
@@ -194,14 +176,8 @@
             text-align: center;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
-        .summary-box h2 {
-            margin-bottom: 15px;
-            color: #1a3e6e;
-        }
-        .summary-box p {
-            margin: 6px 0;
-            font-size: 1.1rem;
-        }
+        .summary-box h2 { margin-bottom: 15px; color: #1a3e6e; }
+        .summary-box p { margin: 6px 0; font-size: 1.1rem; }
         .summary-box .total-round-points {
             font-weight: bold;
             font-size: 1.4rem;
@@ -289,20 +265,17 @@
         <div id="logArea" class="hidden"></div>
     </div>
 
-    <!-- QR-Scanner Overlay -->
     <div id="scannerOverlay">
         <video id="video" autoplay playsinline></video>
         <p id="scanHint">Richte die Kamera auf den QR-Code.</p>
         <button class="btn danger" onclick="stopScan()">Abbrechen</button>
     </div>
 
-    <!-- Animations-Overlay -->
     <div id="animationOverlay">
         <div id="plane">🛫</div>
         <div class="overlay-text" id="animationText">Flug läuft...</div>
     </div>
 
-    <!-- Zusammenfassungs-Overlay -->
     <div id="summaryOverlay">
         <div class="summary-box">
             <h2>Rundenabschluss</h2>
@@ -337,7 +310,19 @@
         let videoStream = null;
         let scannerActive = false;
 
-        // ==================== HILFSFUNKTIONEN ====================
+        // Umlaut-Rückersetzung für QR-Codes
+        function restoreUmlauts(str) {
+            if (typeof str !== 'string') return str;
+            return str
+                .replace(/Ae/g, 'Ä')
+                .replace(/Oe/g, 'Ö')
+                .replace(/Ue/g, 'Ü')
+                .replace(/ae/g, 'ä')
+                .replace(/oe/g, 'ö')
+                .replace(/ue/g, 'ü')
+                .replace(/ss/g, 'ß');
+        }
+
         function updateStatus() {
             document.getElementById('roundDisplay').textContent = `${currentRound}/12`;
             document.getElementById('pointsDisplay').textContent = totalPoints;
@@ -362,9 +347,8 @@
             }
         }
         function toggleLog() {
-            const logArea = document.getElementById('logArea');
-            logArea.classList.toggle('hidden');
-            if (!logArea.classList.contains('hidden')) updateLogDisplay();
+            document.getElementById('logArea').classList.toggle('hidden');
+            if (!document.getElementById('logArea').classList.contains('hidden')) updateLogDisplay();
         }
 
         function pushHistory() {
@@ -377,10 +361,7 @@
         }
 
         function undo() {
-            if (historyStack.length <= 1) {
-                alert('Kein früherer Zustand verfügbar.');
-                return;
-            }
+            if (historyStack.length <= 1) { alert('Kein früherer Zustand verfügbar.'); return; }
             historyStack.pop();
             const state = historyStack[historyStack.length - 1];
             currentRound = state.currentRound;
@@ -421,17 +402,14 @@
         function updateContinueButton() {
             const btn = document.getElementById('btnContinue');
             if (currentTankAction !== null) {
-                btn.classList.add('btn-danger'); // rot
                 btn.style.background = '#dc3545';
                 btn.style.color = 'white';
             } else {
-                btn.classList.remove('btn-danger');
                 btn.style.background = '#e0e0e0';
                 btn.style.color = '#333';
             }
         }
 
-        // ==================== PHASEN-STEUERUNG ====================
         function showStartSection() {
             document.getElementById('startSection').classList.remove('hidden');
             document.getElementById('tankSection').classList.add('hidden');
@@ -481,15 +459,10 @@
 
         function chooseTankAction(action) {
             if (currentTankAction === action) return;
-            if (currentTankAction === 'bonus') {
-                tempBonusIncrease = 0;
-            }
+            if (currentTankAction === 'bonus') tempBonusIncrease = 0;
             currentTankAction = action;
-            if (action === 'bonus') {
-                tempBonusIncrease = 1;
-            } else {
-                tempBonusIncrease = 0;
-            }
+            if (action === 'bonus') tempBonusIncrease = 1;
+            else tempBonusIncrease = 0;
             updateTankUI();
             updateStatus();
         }
@@ -520,10 +493,7 @@
         }
 
         function finishTankPhase() {
-            if (currentTankAction === null) {
-                alert('Bitte wähle zuerst Tanken oder Bonuskarte.');
-                return;
-            }
+            if (currentTankAction === null) { alert('Bitte wähle zuerst Tanken oder Bonuskarte.'); return; }
             if (currentTankAction === 'tank') {
                 const maxTank = 4000 + (bonusCards + tempBonusIncrease) * 250;
                 tank = Math.min(maxTank, tank + 1000);
@@ -588,8 +558,7 @@
         // ==================== QR-SCANNER ====================
         async function startScan(target) {
             scanTarget = target;
-            const overlay = document.getElementById('scannerOverlay');
-            overlay.classList.add('active');
+            document.getElementById('scannerOverlay').classList.add('active');
             document.getElementById('scanHint').textContent = 'Richte die Kamera auf den QR-Code.';
             try {
                 if (!videoStream) {
@@ -646,6 +615,11 @@
                 stopScan();
                 return;
             }
+            // Umlaute wiederherstellen
+            airport.name = restoreUmlauts(airport.name);
+            airport.country = restoreUmlauts(airport.country);
+            if (airport.cluster) airport.cluster = restoreUmlauts(airport.cluster);
+            airport.population = airport.population || 0;
             airport.bonus = airport.bonus || 0;
             stopScan();
             if (scanTarget === 'start') {
@@ -816,9 +790,6 @@
                 window._summaryResolve = null;
             }
         }
-
-        // ==================== UNDO (Test) ====================
-        // Button kann ergänzt werden
 
         // ==================== INIT ====================
         window.onload = function() {
